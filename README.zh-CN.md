@@ -3,7 +3,6 @@
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/gpchn/lesser)
 ![GitHub issues](https://img.shields.io/github/issues/gpchn/lesser)
-![GitHub repo size](https://img.shields.io/github/repo-size/gpchn/lesser)
 ![GitHub last commit (by committer)](https://img.shields.io/github/last-commit/gpchn/lesser)
 
 lesser.py 是一个命令行压缩、解压缩软件
