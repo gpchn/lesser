@@ -11,12 +11,14 @@ SUPPORTED_FORMATS = (
     "lzma",
     "rar",
     "zst", "zstd",
-    "br", "brotli")
+    "br", "brotli",
+    "xz", "xzip")
 
 from pathlib import Path
 from os import environ
 
 from zipfile import ZipFile, ZIP_DEFLATED
+from zipfile_xz import ZipFile as XzipFile, ZIP_XZ
 from bz2 import BZ2File
 from gzip import open as gzip_open
 from py7zr import SevenZipFile
@@ -31,8 +33,8 @@ from brotli import compress as br_compress, decompress as br_decompress
 
 
 # 获取程序运行参数
-def getArgs():
-    global ARGS
+def getargs():
+    global args
     from argparse import ArgumentParser
     from time import strftime
 
@@ -55,113 +57,120 @@ def getArgs():
     format_subgroup.add_argument("--rar", action="store_true", help="Set rar format.")
     format_subgroup.add_argument("--zstd", action="store_true", help="Set zstd format.")
     format_subgroup.add_argument("--brotli", action="store_true", help="Set brotli format.")
+    format_subgroup.add_argument("--xzip", action="store_true", help="Set xzip format.")
     parser.add_argument("-i", "--input", type=Path, required=True, help="Input file path. In compress mode it should be the original file, and in decompress mode it should be the compressed file.")
     parser.add_argument("-o", "--output", type=Path, default=f"{strftime('%y%m%d-%H%M%S')}.zip", help="Output file path. In compress mode it should be the compressed file, and in decompress mode it should be the folder.")
-    ARGS = parser.parse_args()
+    args = parser.parse_args()
 
 
 # 我知道这写法很烂，但我莫得选择（悲）
+# match-case 在这用不了，因为有 in 判断
 def main():
-    if ARGS.compress:
-        if ARGS.zip or ARGS.format == "zip":
-            with ZipFile(ARGS.output, "w", ZIP_DEFLATED) as f:
+    if args.compress:
+        if args.zip or args.format == "zip":
+            with ZipFile(args.output, "w", ZIP_DEFLATED) as f:
                 # 第二个参数 arcname 是为了避免把文件名储存为它的绝对路径
-                f.write(ARGS.input, ARGS.input.name)
-            end()
-        if ARGS.bz2 or ARGS.format == "bz2":
-            with BZ2File(ARGS.output, "wb") as f:
-                with open(ARGS.input, "rb") as g:
+                f.write(args.input, args.input.name)
+            
+        elif args.bz2 or args.format == "bz2":
+            with BZ2File(args.output, "wb") as f:
+                with open(args.input, "rb") as g:
                     f.write(g.read())
-            end()
-        if ARGS.gzip or ARGS.format in ("gz", "gzip"):
-            with open(ARGS.input, "rb") as f:
-                with gzip_open(ARGS.output, "wb") as g:
+            
+        elif args.gzip or args.format in ("gz", "gzip"):
+            with open(args.input, "rb") as f:
+                with gzip_open(args.output, "wb") as g:
                     g.write(f.read())
-            end()
-        if ARGS.sevenzip or ARGS.format in ("7z", "7zip", "sevenzip"):
-            with SevenZipFile(ARGS.output, "w")as f:
-                f.writeall(ARGS.input)
-            end()
-        if ARGS.tar or ARGS.format == "tar":
-            with tar_open(ARGS.output, "w") as f:
-                f.add(ARGS.input)
-            end()
-        if ARGS.lzma or ARGS.format == "lzma":
-            with open(ARGS.input, "rb") as f:
-                with lzma_open(ARGS.output, "wb") as g:
+            
+        elif args.sevenzip or args.format in ("7z", "7zip", "sevenzip"):
+            with SevenZipFile(args.output, "w")as f:
+                f.writeall(args.input)
+            
+        elif args.tar or args.format == "tar":
+            with tar_open(args.output, "w") as f:
+                f.add(args.input)
+            
+        elif args.lzma or args.format == "lzma":
+            with open(args.input, "rb") as f:
+                with lzma_open(args.output, "wb") as g:
                     g.write(f.read())
-            end()
-        if ARGS.rar or ARGS.format == "rar":
+            
+        elif args.rar or args.format == "rar":
             print("Sorry, this program does not support rar compressed format.")
             exit(1)
-        if ARGS.zstd or ARGS.format in ("zst", "zstd"):
-            with ZstdFile(ARGS.output, "wb") as f:
-                with open(ARGS.input, "rb") as g:
+        elif args.zstd or args.format in ("zst", "zstd"):
+            with ZstdFile(args.output, "wb") as f:
+                with open(args.input, "rb") as g:
                     f.write(g.read())
-            end()
-        if ARGS.brotli or ARGS.format in ("br", "brotli"):
-            with open(ARGS.output, "wb") as f:
-                with open(ARGS.input, "rb") as g:
+            
+        elif args.brotli or args.format in ("br", "brotli"):
+            with open(args.output, "wb") as f:
+                with open(args.input, "rb") as g:
                     f.write(br_compress(g.read()))
-            end()
+            
+        elif args.xzip or args.format in ("xz", "xzip"):
+            with XzipFile(args.output, "w", ZIP_XZ) as f:
+                f.write(args.input, args.input.name)
+            
         else:
-            print(f"Sorry, this program does not support '{ARGS.format}' format yet.")
+            print(f"Sorry, this program does not support '{args.format}' format yet.")
             print("To add support for this format, please open an issue in github. (https://github.com/gpchn/lesser/issues/new)")
             exit(1)
 
-    elif ARGS.decompress:
-        if ARGS.zip or ARGS.format == "zip":
-            with ZipFile(ARGS.input, "r", ZIP_DEFLATED) as f:
-                f.extractall(path=ARGS.output, members=f.namelist())
-            end()
-        if ARGS.bz2 or ARGS.format == "bz2":
-            with BZ2File(ARGS.input, "rb") as f:
-                with open(ARGS.output, "wb") as g:
+    elif args.decompress:
+        if args.zip or args.format == "zip":
+            with ZipFile(args.input, "r", ZIP_DEFLATED) as f:
+                f.extractall(path=args.output, members=f.namelist())
+            
+        elif args.bz2 or args.format == "bz2":
+            with BZ2File(args.input, "rb") as f:
+                with open(args.output, "wb") as g:
                     g.write(f.read())
-            end()
-        if ARGS.gzip or ARGS.format in ("gz", "gzip"):
-            with open(ARGS.output, "wb") as f:
-                with gzip_open(ARGS.input, "rb") as g:
+            
+        elif args.gzip or args.format in ("gz", "gzip"):
+            with open(args.output, "wb") as f:
+                with gzip_open(args.input, "rb") as g:
                     f.write(g.read())
-            end()
-        if ARGS.sevenzip or ARGS.format in ("7z", "sevenzip"):
-            with SevenZipFile(ARGS.input) as f:
-                f.extractall(ARGS.output)
-            end()
-        if ARGS.tar or ARGS.format == "tar":
-            with tar_open(ARGS.input, "r") as f:
-                f.extractall(ARGS.output)
-            end()
-        if ARGS.lzma or ARGS.format == "lzma":
-            with lzma_open(ARGS.input, "rb") as f:
-                with open(ARGS.output, "wb") as g:
+            
+        elif args.sevenzip or args.format in ("7z", "sevenzip"):
+            with SevenZipFile(args.input) as f:
+                f.extractall(args.output)
+            
+        elif args.tar or args.format == "tar":
+            with tar_open(args.input, "r") as f:
+                f.extractall(args.output)
+            
+        elif args.lzma or args.format == "lzma":
+            with lzma_open(args.input, "rb") as f:
+                with open(args.output, "wb") as g:
                     g.write(f.read())
-            end()
-        if ARGS.rar or ARGS.format == "rar":
-            with RarFile(ARGS.input) as f:
-                f.extractall(ARGS.output)
-            end()
-        if ARGS.zstd or ARGS.format in ("zst", "zstd"):
-            with ZstdFile(ARGS.input, "rb") as f:
-                with open(ARGS.output, "wb") as g:
+            
+        elif args.rar or args.format == "rar":
+            with RarFile(args.input) as f:
+                f.extractall(args.output)
+            
+        elif args.zstd or args.format in ("zst", "zstd"):
+            with ZstdFile(args.input, "rb") as f:
+                with open(args.output, "wb") as g:
                     g.write(f.read())
-            end()
-        if ARGS.brotli or ARGS.format in ("br", "brotli"):
-            with open(ARGS.input, "rb") as f:
-                with open(ARGS.output, "wb") as g:
+            
+        elif args.brotli or args.format in ("br", "brotli"):
+            with open(args.input, "rb") as f:
+                with open(args.output, "wb") as g:
                     g.write(br_decompress(f.read()))
-            end()
+            
+        elif args.xzip or args.format in ("xz", "xzip"):
+            with XzipFile(args.input, "r", ZIP_XZ) as f:
+                f.extractall(path=args.output, members=f.namelist())
+            
         else:
-            print(f"Sorry, this program does not support '{ARGS.format}' format yet.")
+            print(f"Sorry, this program does not support '{args.format}' format yet.")
             print("To add support for this format, please open an issue in github. (https://github.com/gpchn/lesser/issues/new)")
             exit(1)
 
-
-def end():
-    print("Execute successfully.")
-    exit(0)
+        print("Execute successfully.")
 
 
 if __name__ == "__main__":
-    getArgs()
+    getargs()
     main()
